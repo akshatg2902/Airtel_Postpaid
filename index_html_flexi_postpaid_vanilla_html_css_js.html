@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flexi‑Postpaid Plan Builder</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #0f172a; /* slate-900 */
+      --muted: #475569; /* slate-600 */
+      --border: #e5e7eb; /* gray-200 */
+      --brand: #dc2626; /* red-600 */
+      --brand-700: #b91c1c;
+      --green: #16a34a;
+      --shadow: 0 10px 20px rgba(2, 6, 23, 0.06);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; background: var(--bg); color: var(--text); }
+    .container { max-width: 760px; padding: 24px; margin: 0 auto; }
+    .phone { max-width: 420px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 24px; box-shadow: var(--shadow); }
+    h1 { text-align: center; line-height:1.15; margin: 0 0 12px; font-size: 28px; }
+    h1 .accent { color: var(--brand); font-weight: 800; }
+    h2 { font-size: 20px; margin: 28px 0 10px; font-weight: 800; }
+
+    /* Chips */
+    .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .chip { border: 1px solid var(--border); background: #fff; color: var(--text); padding: 8px 12px; border-radius: 999px; font-weight: 600; font-size: 14px; white-space: nowrap; cursor: pointer; }
+    .chip.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+    /* Card */
+    .card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+    .row { display:flex; align-items:center; justify-content: space-between; gap: 12px; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .benefits { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px; margin-top: 10px; }
+    .benefit { display:flex; align-items:center; gap:8px; font-size: 13px; }
+    .tick { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:999px; background:#dcfce7; color:var(--green); font-size: 14px; }
+
+    /* Range */
+    .range { width: 100%; }
+    .range + .range-info { display:flex; justify-content: space-between; font-weight:700; margin-top:6px; }
+
+    /* Toggle */
+    .switch { position: relative; display: inline-block; width: 46px; height: 26px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: #d1d5db; border-radius: 999px; transition: background .2s; }
+    .slider:before { content: ""; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+    .switch input:checked + .slider { background: var(--brand); }
+    .switch input:checked + .slider:before { transform: translateX(20px); }
+
+    /* Grid */
+    .grid { display:grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 520px) { .grid { grid-template-columns: 1fr 1fr; } }
+
+    /* Select */
+    .select { width:100%; border:1px solid var(--border); border-radius: 12px; padding: 10px 12px; background:#fff; color: var(--text); }
+
+    /* CTA */
+    .cta { margin-top: 18px; position: sticky; bottom: 0; }
+    .btn { width: 100%; border: 0; background: var(--brand); color: #fff; font-weight: 800; padding: 14px; border-radius: 16px; cursor: pointer; box-shadow: var(--shadow); font-size: 16px; }
+    .btn:hover { background: var(--brand-700); }
+
+    /* Helpers */
+    .spacer { height: 6px; }
+    .price { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="phone">
+      <h1><span class="accent">Build Your</span><br><span>Flexi‑Postpaid Plan</span></h1>
+
+      <!-- Base rental chips -->
+      <h2>Choose Base Rental</h2>
+      <div class="chips" id="base-chips"></div>
+      <div id="base-details" class="card" style="display:none; margin-top:8px;"></div>
+
+      <!-- Extra data -->
+      <h2>Add Extra Data</h2>
+      <div class="muted">₹2/GB</div>
+      <input id="extra-data" class="range" type="range" min="0" max="100" step="1" value="50" />
+      <div class="range-info"><span id="extra-data-gb">50 GB</span><span id="extra-data-price">+₹100</span></div>
+
+      <!-- Bundles -->
+      <h2>Choose Bundles</h2>
+      <div class="grid" id="bundles-grid"></div>
+
+      <!-- Spend Cap (visual only) -->
+      <h2>Set Monthly Spend Cap</h2>
+      <input id="cap" class="range" type="range" min="500" max="3000" step="50" value="1000" />
+      <div class="range-info"><span>Cap</span><span id="cap-value">₹1,000</span></div>
+
+      <!-- CTA -->
+      <div class="cta"><button id="cta" class="btn">Confirm Plan & Activate · ₹0/mo</button></div>
+    </div>
+  </div>
+
+  <script>
+    // ----- Data --------------------------------------------------------------
+    const basePlans = [
+      { id: 'basic', name: 'Basic', price: 199, benefits: ['Unlimited Calls','100 SMS/day','30 GB 5G data'] },
+      { id: 'smart', name: 'Smart', price: 299, benefits: ['Unlimited Calls','200 SMS/day','60 GB 5G data','Weekend Data Rollover'] },
+      { id: 'max',   name: 'Max',   price: 399, benefits: ['Unlimited Calls','300 SMS/day','90 GB 5G data','Weekend Data Rollover','Roaming (Domestic)','5G Priority Network'] },
+    ];
+
+    const bundles = {
+      ott: {
+        label: 'OTT Pack', defaultOn: true,
+        options: [
+          { id:'netflix', label:'Netflix', price:199 },
+          { id:'prime', label:'Amazon Prime', price:149 },
+          { id:'hotstar', label:'Disney+ Hotstar', price:199 },
+          { id:'sonyliv', label:'Sony LIV', price:129 },
+        ],
+        selected: 'netflix'
+      },
+      gaming: {
+        label: 'Gaming Pack', defaultOn: true,
+        options: [
+          { id:'xbox', label:'Xbox Live (Core)', price:99 },
+          { id:'psplus_ess', label:'PlayStation Plus Essential', price:149 },
+          { id:'psplus_extra', label:'PlayStation Plus Extra', price:199 },
+        ],
+        selected: 'xbox'
+      },
+      travel: {
+        label: 'Travel Data', defaultOn: false,
+        options: [
+          { id:'domestic5', label:'Domestic 5GB', price:199 },
+          { id:'intl1', label:'International 1GB', price:399 },
+          { id:'intl3', label:'International 3GB', price:699 },
+        ],
+        selected: 'domestic5'
+      },
+      ai: {
+        label: 'AI Tools', defaultOn: false,
+        options: [
+          { id:'chatgpt_go', label:'ChatGPT Go', price:99 },
+          { id:'perplexity_pro', label:'Perplexity Pro', price:299 },
+          { id:'chatgpt_plus', label:'ChatGPT Plus', price:499 },
+        ],
+        selected: 'chatgpt_go'
+      },
+      linkedin: {
+        label: 'LinkedIn Premium', defaultOn: false,
+        options: [
+          { id:'career', label:'LinkedIn Premium Career', price:199 },
+          { id:'business', label:'LinkedIn Premium Business', price:349 },
+        ],
+        selected: 'career'
+      },
+      cloud: {
+        label: 'Cloud Storage', defaultOn: true,
+        options: [
+          { id:'100', label:'Cloud Storage 100 GB', price:99 },
+          { id:'1tb', label:'Cloud Storage 1 TB', price:149 },
+          { id:'2tb', label:'Cloud Storage 2 TB', price:249 },
+        ],
+        selected: '1tb'
+      },
+      fitness: {
+        label: 'Fitness & Health', defaultOn: true,
+        options: [
+          { id:'basic', label:'Fitness & Health Basic', price:99 },
+          { id:'plus', label:'Fitness & Health Plus', price:149 },
+        ],
+        selected: 'basic'
+      },
+      edu: {
+        label: 'Education Pack', defaultOn: false,
+        options: [
+          { id:'k12', label:'Education Pack K-12', price:149 },
+          { id:'college', label:'Education Pack College', price:249 },
+          { id:'pro', label:'Education Pack Pro', price:299 },
+        ],
+        selected: 'college'
+      },
+    };
+
+    const EXTRA_RATE = 2; // ₹2/GB
+
+    // ----- State -------------------------------------------------------------
+    let state = {
+      base: basePlans[1].id, // default Smart
+      showBaseDetails: false,
+      extraData: 50,
+      cap: 1000,
+      toggles: Object.fromEntries(Object.keys(bundles).map(k => [k, !!bundles[k].defaultOn])),
+      selected: Object.fromEntries(Object.keys(bundles).map(k => [k, bundles[k].selected])),
+    };
+
+    // ----- Utils -------------------------------------------------------------
+    const fmt = (n) => new Intl.NumberFormat('en-IN').format(n);
+    const rs = (n) => `₹${fmt(n)}`;
+
+    function currentBasePlan() { return basePlans.find(p => p.id === state.base); }
+
+    function calcTotal() {
+      let t = currentBasePlan().price;
+      t += state.extraData * EXTRA_RATE;
+      for (const key of Object.keys(bundles)) {
+        if (!state.toggles[key]) continue;
+        const optId = state.selected[key];
+        const opt = bundles[key].options.find(o => o.id === optId);
+        if (opt) t += opt.price;
+      }
+      return t;
+    }
+
+    // ----- Renderers ---------------------------------------------------------
+    function renderBaseChips() {
+      const root = document.getElementById('base-chips');
+      root.innerHTML = '';
+      basePlans.forEach(plan => {
+        const chip = document.createElement('button');
+        chip.className = 'chip' + (plan.id === state.base ? ' active' : '');
+        chip.textContent = `${plan.name} · ${rs(plan.price)}`;
+        chip.addEventListener('click', () => {
+          state.base = plan.id;
+          state.showBaseDetails = true;
+          renderBaseChips();
+          renderBaseDetails();
+          updateTotals();
+        });
+        root.appendChild(chip);
+      });
+    }
+
+    function renderBaseDetails() {
+      const box = document.getElementById('base-details');
+      if (!state.showBaseDetails) { box.style.display = 'none'; return; }
+      const plan = currentBasePlan();
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div class="row">
+          <div>
+            <div style="font-weight:800; font-size:16px;">${plan.name}</div>
+            <div class="muted">Included in this plan</div>
+          </div>
+          <button id="collapse" class="chip" style="border-radius:12px;">Collapse</button>
+        </div>
+        <div class="benefits">
+          ${plan.benefits.map(b => `
+            <div class="benefit"><span class="tick">✓</span><span>${b}</span></div>
+          `).join('')}
+        </div>
+      `;
+      document.getElementById('collapse').addEventListener('click', () => {
+        state.showBaseDetails = false;
+        renderBaseDetails();
+      });
+    }
+
+    function renderBundles() {
+      const grid = document.getElementById('bundles-grid');
+      grid.innerHTML = '';
+      for (const key of Object.keys(bundles)) {
+        const b = bundles[key];
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="row">
+            <div style="font-weight:700; font-size:16px;">${b.label}</div>
+            <label class="switch">
+              <input type="checkbox" ${state.toggles[key] ? 'checked' : ''} id="tgl-${key}" aria-label="Toggle ${b.label}" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div style="margin-top:10px;">
+            <select id="sel-${key}" class="select" ${state.toggles[key] ? '' : 'disabled'}>
+              ${b.options.map(o => `<option value="${o.id}" ${state.selected[key]===o.id?'selected':''}>${o.label} · ${rs(o.price)}</option>`).join('')}
+            </select>
+            <div style="text-align:right; margin-top:6px;" class="muted"><span class="price" id="price-${key}"></span></div>
+          </div>
+        `;
+        grid.appendChild(card);
+
+        // events
+        document.getElementById(`tgl-${key}`).addEventListener('change', (e) => {
+          state.toggles[key] = e.target.checked;
+          document.getElementById(`sel-${key}`).disabled = !state.toggles[key];
+          updateTotals();
+        });
+        document.getElementById(`sel-${key}`).addEventListener('change', (e) => {
+          state.selected[key] = e.target.value;
+          updateTotals();
+        });
+      }
+      // initialize per-card price labels
+      for (const key of Object.keys(bundles)) updateBundlePriceLabel(key);
+    }
+
+    function updateBundlePriceLabel(key) {
+      const on = state.toggles[key];
+      const optId = state.selected[key];
+      const opt = bundles[key].options.find(o => o.id === optId);
+      const el = document.getElementById(`price-${key}`);
+      el.textContent = on && opt ? rs(opt.price) : rs(0);
+    }
+
+    function updateTotals() {
+      // per-card labels
+      for (const key of Object.keys(bundles)) updateBundlePriceLabel(key);
+      // extra data labels
+      const gb = state.extraData;
+      const extraPrice = gb * EXTRA_RATE;
+      document.getElementById('extra-data-gb').textContent = `${gb} GB`;
+      document.getElementById('extra-data-price').textContent = `+${rs(extraPrice)}`;
+      // cap label
+      document.getElementById('cap-value').textContent = rs(state.cap);
+      // CTA total
+      const total = calcTotal();
+      document.getElementById('cta').textContent = `Confirm Plan & Activate · ${rs(total)}/mo`;
+    }
+
+    // ----- Wire inputs -------------------------------------------------------
+    document.getElementById('extra-data').addEventListener('input', (e) => { state.extraData = +e.target.value; updateTotals(); });
+    document.getElementById('cap').addEventListener('input', (e) => { state.cap = +e.target.value; updateTotals(); });
+
+    // ----- Init --------------------------------------------------------------
+    renderBaseChips();
+    renderBaseDetails();
+    renderBundles();
+    updateTotals();
+  </script>
+</body>
+</html>
